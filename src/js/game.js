@@ -26,6 +26,20 @@ const EXIT_WAYPOINTS = {
   clyde:  [ { x: 14, y: 14 }, { x: 14, y: 11 } ],
 };
 
+// Fantasma nuevo a partir de su entrada en GHOST_STARTS.
+function makeGhost( start ) {
+  return {
+    x: start.x,
+    y: start.y,
+    dir: 'up',
+    speed: GHOST_SPEED,
+    kind: start.kind,
+    mode: 'pen', // congelado en la pen hasta agotar releaseDelay
+    waypoints: EXIT_WAYPOINTS[ start.kind ].map( ( w ) => ( { ...w } ) ),
+    releaseDelay: start.releaseDelay,
+  };
+}
+
 // Crea una partida nueva. Copia MAZE (pristino) a game.grid para poder comer
 // dots sin destruir el original, y reiniciar.
 function createGame() {
@@ -49,16 +63,7 @@ function createGame() {
       nextDir: null,
       speed: PACMAN_SPEED,
     },
-    ghosts: GHOST_STARTS.map( ( g ) => ( {
-      x: g.x,
-      y: g.y,
-      dir: 'up',
-      speed: GHOST_SPEED,
-      kind: g.kind,
-      mode: 'pen', // congelado en la pen hasta agotar releaseDelay
-      waypoints: EXIT_WAYPOINTS[ g.kind ].map( ( w ) => ( { ...w } ) ),
-      releaseDelay: g.releaseDelay,
-    } ) ),
+    ghosts: GHOST_STARTS.map( makeGhost ),
     mode: 'scatter',
     modeTimer: SCATTER_FRAMES,
   };
@@ -251,10 +256,12 @@ function resetPositions( game ) {
   p.dir = 'left';
   p.nextDir = null;
   game.ghosts.forEach( ( g, i ) => {
-    g.x = GHOST_STARTS[ i ].x;
-    g.y = GHOST_STARTS[ i ].y;
-    g.dir = 'up';
+    // Restaurar el fantasma por completo: posicion, pen, waypoints y retraso.
+    Object.assign( g, makeGhost( GHOST_STARTS[ i ] ) );
   } );
+  // Reiniciar el ciclo scatter/chase.
+  game.mode = 'scatter';
+  game.modeTimer = SCATTER_FRAMES;
 }
 
 function collides( a, b ) {
