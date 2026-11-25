@@ -74,14 +74,16 @@ function aligned( v ) {
 }
 
 // Una celda es muro para el actor dado?
-//   pacman: bloqueado por pared (1) y puerta (3)
-//   ghost:  bloqueado solo por pared (1)
+// La puerta (tile 3) es de UN SOLO SENTIDO: bloquea a Pac-Man y a los
+// fantasmas en modo 'normal'. Solo la cruzan los fantasmas saliendo,
+// cuyo modo 'exit' avanza por waypoints fijos sin consultar canMove.
+// El parametro actor se conserva para reglas futuras por actor.
 function isWall( grid, x, y, actor ) {
   if ( y < 0 || y >= grid.length ) return true;
   if ( x < 0 || x >= grid[ 0 ].length ) return true;
   const v = grid[ y ][ x ];
   if ( v === 1 ) return true;
-  if ( v === 3 && actor === 'pacman' ) return true;
+  if ( v === 3 ) return true; // puerta: nadie la cruza via canMove
   return false;
 }
 
@@ -206,8 +208,9 @@ function moveGhost( game, g ) {
     return;
   }
 
-  // Exit: avanzar celda a celda hacia el waypoint actual (la puerta, tile 3,
-  // ya es transitable para fantasmas). Al consumirlos todos pasa a 'normal'.
+  // Exit: avanzar celda a celda hacia el waypoint actual. No consulta
+  // canMove, por eso puede cruzar la puerta (tile 3), que isWall bloquea
+  // para todos. Al consumirlos todos pasa a 'normal'.
   if ( g.mode === 'exit' ) {
     if ( aligned( g.x ) && aligned( g.y ) ) {
       g.x = Math.round( g.x );
