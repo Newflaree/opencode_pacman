@@ -51,12 +51,24 @@ const MAZE = MAZE_STR.map( ( row ) => row.split( '' ).map( parseTile ) );
 
 const TUNNEL_ROW = 14;
 const PACMAN_START = { x: 13, y: 23 };
+// releaseDelay en frames (~60fps): blinky sale ya, pinky ~3s, inky ~8s, clyde ~12s.
 const GHOST_STARTS = [
-  { x: 13, y: 14, kind: 'hunter' }, // dentro de la pen
-  { x: 14, y: 14, kind: 'random' }, // dentro de la pen
+  { x: 13, y: 14, kind: 'blinky', releaseDelay: 0 },   // sale ya
+  { x: 14, y: 14, kind: 'pinky',  releaseDelay: 180 },  // ~3s
+  { x: 12, y: 14, kind: 'inky',   releaseDelay: 480 },  // ~8s
+  { x: 15, y: 14, kind: 'clyde', releaseDelay: 720 },   // ~12s
 ];
+
+// Esquinas de scatter (una por fantasma, a donde van en modo scatter).
+const SCATTER_CORNERS = {
+  blinky: { x: 26, y: 1 },   // arriba-derecha
+  pinky:  { x: 1,  y: 1 },   // arriba-izquierda
+  inky:   { x: 26, y: 29 },  // abajo-derecha
+  clyde:  { x: 1,  y: 29 },  // abajo-izquierda
+};
 
 window.MAZE = MAZE;
 window.TUNNEL_ROW = TUNNEL_ROW;
 window.PACMAN_START = PACMAN_START;
 window.GHOST_STARTS = GHOST_STARTS;
+window.SCATTER_CORNERS = SCATTER_CORNERS;
