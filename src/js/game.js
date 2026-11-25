@@ -208,8 +208,9 @@ function moveGhost( game, g ) {
     return;
   }
 
-  // Exit: avanzar celda a celda hacia el waypoint actual (la puerta, tile 3,
-  // ya es transitable para fantasmas). Al consumirlos todos pasa a 'normal'.
+  // Exit: avanzar celda a celda hacia el waypoint actual. No consulta
+  // canMove, por eso puede cruzar la puerta (tile 3), que isWall bloquea
+  // para todos. Al consumirlos todos pasa a 'normal'.
   if ( g.mode === 'exit' ) {
     if ( aligned( g.x ) && aligned( g.y ) ) {
       g.x = Math.round( g.x );
