@@ -261,7 +261,21 @@ function collides( a, b ) {
   return Math.abs( a.x - b.x ) < 0.5 && Math.abs( a.y - b.y ) < 0.5;
 }
 
+// Decrementa el timer y alterna scatter (7s) -> chase (20s) -> repetir.
+function updateMode( game ) {
+  game.modeTimer--;
+  if ( game.modeTimer > 0 ) return;
+  if ( game.mode === 'scatter' ) {
+    game.mode = 'chase';
+    game.modeTimer = CHASE_FRAMES;
+  } else {
+    game.mode = 'scatter';
+    game.modeTimer = SCATTER_FRAMES;
+  }
+}
+
 function update( game ) {
+  updateMode( game );
   movePacman( game );
   game.ghosts.forEach( ( g ) => moveGhost( game, g ) );
 
