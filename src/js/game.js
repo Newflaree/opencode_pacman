@@ -1,6 +1,6 @@
 // game.js
 // Estado y reglas. Depende de globals de maze.js: MAZE, TUNNEL_ROW,
-// PACMAN_START, GHOST_STARTS.
+// PACMAN_START, GHOST_STARTS, SCATTER_CORNERS.
 
 const DIRS = {
   left: { x: -1, y: 0 },
@@ -12,6 +12,33 @@ const OPPOSITE = { left: 'right', right: 'left', up: 'down', down: 'up' };
 
 const PACMAN_SPEED = 0.125; // 1/8 celda/frame -> alinea cada 8 frames
 const GHOST_SPEED = 0.1;    // 1/10 celda/frame
+
+// Ciclo scatter/chase en frames (~60fps): scatter 7s -> chase 20s -> repetir.
+const SCATTER_FRAMES = 420;
+const CHASE_FRAMES = 1200;
+
+// Waypoints de salida de la pen, consumidos en modo 'exit'.
+// La puerta esta en fila 12, cols 13-14; se sale a la fila 11.
+const EXIT_WAYPOINTS = {
+  blinky: [ { x: 13, y: 11 } ],
+  pinky:  [ { x: 14, y: 11 } ],
+  inky:   [ { x: 13, y: 14 }, { x: 13, y: 11 } ],
+  clyde:  [ { x: 14, y: 14 }, { x: 14, y: 11 } ],
+};
+
+// Fantasma nuevo a partir de su entrada en GHOST_STARTS.
+function makeGhost( start ) {
+  return {
+    x: start.x,
+    y: start.y,
+    dir: 'up',
+    speed: GHOST_SPEED,
+    kind: start.kind,
+    mode: 'pen', // congelado en la pen hasta agotar releaseDelay
+    waypoints: EXIT_WAYPOINTS[ start.kind ].map( ( w ) => ( { ...w } ) ),
+    releaseDelay: start.releaseDelay,
+  };
+}
 
 // Crea una partida nueva. Copia MAZE (pristino) a game.grid para poder comer
 // dots sin destruir el original, y reiniciar.
@@ -36,13 +63,9 @@ function createGame() {
       nextDir: null,
       speed: PACMAN_SPEED,
     },
-    ghosts: GHOST_STARTS.map( ( g ) => ( {
-      x: g.x,
-      y: g.y,
-      dir: 'up',
-      speed: GHOST_SPEED,
-      kind: g.kind,
-    } ) ),
+    ghosts: GHOST_STARTS.map( makeGhost ),
+    mode: 'scatter',
+    modeTimer: SCATTER_FRAMES,
   };
 }
 
@@ -110,9 +133,44 @@ function movePacman( game ) {
   wrapTunnel( p, width );
 }
 
+// Tile objetivo de un fantasma segun su personalidad y el modo del juego.
+// En scatter todos apuntan a su esquina. El objetivo puede caer fuera del
+// laberinto: solo se usa como referencia de distancia, nunca se pisa.
+function ghostTarget( game, g ) {
+  const p = game.pacman;
+  const px = Math.round( p.x );
+  const py = Math.round( p.y );
+
+  if ( game.mode === 'scatter' ) return SCATTER_CORNERS[ g.kind ];
+
+  switch ( g.kind ) {
+    case 'blinky':
+      // Agresivo: el tile de Pac-Man.
+      return { x: px, y: py };
+    case 'pinky': {
+      // Embosca: 4 celdas delante de la direccion de Pac-Man (vector limpio,
+      // sin el bug historico del overflow con 'up').
+      const d = DIRS[ p.dir ];
+      return { x: px + d.x * 4, y: py + d.y * 4 };
+    }
+    case 'inky': {
+      // Flanquea: 2·(2 celdas delante de Pac-Man) − posicion de blinky.
+      const d = DIRS[ p.dir ];
+      const ax = px + d.x * 2;
+      const ay = py + d.y * 2;
+      const b = game.ghosts.find( ( gg ) => gg.kind === 'blinky' );
+      return { x: ax * 2 - Math.round( b.x ), y: ay * 2 - Math.round( b.y ) };
+    }
+    case 'clyde': {
+      // Timido: persigue solo si esta a mas de 8 celdas; si no, a su esquina.
+      const dist = Math.abs( Math.round( g.x ) - px ) + Math.abs( Math.round( g.y ) - py );
+      return dist > 8 ? { x: px, y: py } : SCATTER_CORNERS.clyde;
+    }
+  }
+}
+
 function decideGhost( game, g ) {
   const grid = game.grid;
-  const p = game.pacman;
 
   const options = Object.keys( DIRS ).filter(
     ( dir ) => dir !== OPPOSITE[ g.dir ] && canMove( grid, g.x, g.y, dir, 'ghost' )
@@ -120,31 +178,64 @@ function decideGhost( game, g ) {
   // Sin salida (callejon): permitir el giro de 180.
   const choices = options.length ? options : [ '' + OPPOSITE[ g.dir ] ];
 
-  if ( g.kind === 'hunter' ) {
-    const px = Math.round( p.x );
-    const py = Math.round( p.y );
-    let best = choices[ 0 ];
-    let bestDist = Infinity;
-    for ( const dir of choices ) {
-      const d = DIRS[ dir ];
-      const nx = g.x + d.x;
-      const ny = g.y + d.y;
-      const dist = Math.abs( nx - px ) + Math.abs( ny - py );
-      if ( dist < bestDist ) {
-        bestDist = dist;
-        best = dir;
-      }
+  // Greedy: la direccion valida que minimiza la distancia Manhattan al target.
+  const t = ghostTarget( game, g );
+  let best = choices[ 0 ];
+  let bestDist = Infinity;
+  for ( const dir of choices ) {
+    const d = DIRS[ dir ];
+    const nx = g.x + d.x;
+    const ny = g.y + d.y;
+    const dist = Math.abs( nx - t.x ) + Math.abs( ny - t.y );
+    if ( dist < bestDist ) {
+      bestDist = dist;
+      best = dir;
     }
-    g.dir = best;
-  } else {
-    g.dir = choices[ Math.floor( Math.random() * choices.length ) ];
   }
+  g.dir = best;
 }
 
 function moveGhost( game, g ) {
   const grid = game.grid;
   const width = grid[ 0 ].length;
 
+  // Pen: congelado; solo descuenta el retraso y al agotarse pasa a 'exit'.
+  if ( g.mode === 'pen' ) {
+    if ( g.releaseDelay > 0 ) g.releaseDelay--;
+    if ( g.releaseDelay <= 0 ) g.mode = 'exit';
+    return;
+  }
+
+  // Exit: avanzar celda a celda hacia el waypoint actual (la puerta, tile 3,
+  // ya es transitable para fantasmas). Al consumirlos todos pasa a 'normal'.
+  if ( g.mode === 'exit' ) {
+    if ( aligned( g.x ) && aligned( g.y ) ) {
+      g.x = Math.round( g.x );
+      g.y = Math.round( g.y );
+
+      const target = g.waypoints[ 0 ];
+      if ( g.x === target.x && g.y === target.y ) {
+        g.waypoints.shift();
+        if ( g.waypoints.length === 0 ) {
+          g.mode = 'normal';
+          // Elegir direccion de IA ya; el opuesto de 'up' evita volver
+          // a entrar por la puerta.
+          decideGhost( game, g );
+          return;
+        }
+      }
+      const next = g.waypoints[ 0 ];
+      g.dir = g.x === next.x
+        ? ( next.y < g.y ? 'up' : 'down' )
+        : ( next.x < g.x ? 'left' : 'right' );
+    }
+    const d = DIRS[ g.dir ];
+    g.x += d.x * g.speed;
+    g.y += d.y * g.speed;
+    return;
+  }
+
+  // Normal: IA greedy.
   if ( aligned( g.x ) && aligned( g.y ) ) {
     g.x = Math.round( g.x );
     g.y = Math.round( g.y );
@@ -165,17 +256,33 @@ function resetPositions( game ) {
   p.dir = 'left';
   p.nextDir = null;
   game.ghosts.forEach( ( g, i ) => {
-    g.x = GHOST_STARTS[ i ].x;
-    g.y = GHOST_STARTS[ i ].y;
-    g.dir = 'up';
+    // Restaurar el fantasma por completo: posicion, pen, waypoints y retraso.
+    Object.assign( g, makeGhost( GHOST_STARTS[ i ] ) );
   } );
+  // Reiniciar el ciclo scatter/chase.
+  game.mode = 'scatter';
+  game.modeTimer = SCATTER_FRAMES;
 }
 
 function collides( a, b ) {
   return Math.abs( a.x - b.x ) < 0.5 && Math.abs( a.y - b.y ) < 0.5;
 }
 
+// Decrementa el timer y alterna scatter (7s) -> chase (20s) -> repetir.
+function updateMode( game ) {
+  game.modeTimer--;
+  if ( game.modeTimer > 0 ) return;
+  if ( game.mode === 'scatter' ) {
+    game.mode = 'chase';
+    game.modeTimer = CHASE_FRAMES;
+  } else {
+    game.mode = 'scatter';
+    game.modeTimer = SCATTER_FRAMES;
+  }
+}
+
 function update( game ) {
+  updateMode( game );
   movePacman( game );
   game.ghosts.forEach( ( g ) => moveGhost( game, g ) );
 
