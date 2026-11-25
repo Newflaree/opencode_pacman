@@ -1,6 +1,6 @@
 # SPEC 02 — Puerta de la pen de un solo sentido
 
-**Estado:** Approved
+**Estado:** Implementado
 **Depende de:** SPEC 01
 **Fecha:** 2026-11-25
 **Objetivo:** Evitar que un fantasma en modo `normal` reentre a la pen por la puerta y quede atrapado orbitando dentro, haciendo la puerta transitable solo hacia afuera, como en el arcade original.
@@ -53,12 +53,12 @@ El parámetro `actor` se conserva en la firma aunque hoy la puerta bloquea a amb
 
 ## Criterios de aceptación
 
-- [ ] Con Pac-Man quieto debajo de la pen y chase forzado, ningún fantasma entra al recinto de la pen (filas 13–15, cols 11–16) en una simulación de 600+ frames.
-- [ ] blinky, pinky, inky y clyde salen a ~0s / ~3s / ~8s / ~12s igual que antes (regresión de salida).
-- [ ] La puerta sigue bloqueando a Pac-Man (no puede entrar a la pen).
-- [ ] Tras perder una vida, los 4 fantasmas vuelven a la pen y vuelven a salir a sus tiempos.
-- [ ] Ningún fantasma atraviesa muros (regresión general de movimiento).
-- [ ] El juego corre sin errores en la consola del navegador.
+- [x] Con Pac-Man quieto debajo de la pen y chase forzado, ningún fantasma entra al recinto de la pen (filas 13–15, cols 11–16) en una simulación de 600+ frames.
+- [x] blinky, pinky, inky y clyde salen a ~0s / ~3s / ~8s / ~12s igual que antes (regresión de salida).
+- [x] La puerta sigue bloqueando a Pac-Man (no puede entrar a la pen).
+- [x] Tras perder una vida, los 4 fantasmas vuelven a la pen y vuelven a salir a sus tiempos.
+- [x] Ningún fantasma atraviesa muros (regresión general de movimiento).
+- [x] El juego corre sin errores en la consola del navegador.
 
 ## Decisiones tomadas y descartadas
 
