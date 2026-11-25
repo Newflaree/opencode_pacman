@@ -13,6 +13,19 @@ const OPPOSITE = { left: 'right', right: 'left', up: 'down', down: 'up' };
 const PACMAN_SPEED = 0.125; // 1/8 celda/frame -> alinea cada 8 frames
 const GHOST_SPEED = 0.1;    // 1/10 celda/frame
 
+// Ciclo scatter/chase en frames (~60fps): scatter 7s -> chase 20s -> repetir.
+const SCATTER_FRAMES = 420;
+const CHASE_FRAMES = 1200;
+
+// Waypoints de salida de la pen, consumidos en modo 'exit'.
+// La puerta esta en fila 12, cols 13-14; se sale a la fila 11.
+const EXIT_WAYPOINTS = {
+  blinky: [ { x: 13, y: 11 } ],
+  pinky:  [ { x: 14, y: 11 } ],
+  inky:   [ { x: 13, y: 14 }, { x: 13, y: 11 } ],
+  clyde:  [ { x: 14, y: 14 }, { x: 14, y: 11 } ],
+};
+
 // Crea una partida nueva. Copia MAZE (pristino) a game.grid para poder comer
 // dots sin destruir el original, y reiniciar.
 function createGame() {
@@ -42,7 +55,12 @@ function createGame() {
       dir: 'up',
       speed: GHOST_SPEED,
       kind: g.kind,
+      mode: 'pen', // congelado en la pen hasta agotar releaseDelay
+      waypoints: EXIT_WAYPOINTS[ g.kind ].map( ( w ) => ( { ...w } ) ),
+      releaseDelay: g.releaseDelay,
     } ) ),
+    mode: 'scatter',
+    modeTimer: SCATTER_FRAMES,
   };
 }
 
