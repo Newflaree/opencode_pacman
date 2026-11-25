@@ -163,6 +163,43 @@ function moveGhost( game, g ) {
   const grid = game.grid;
   const width = grid[ 0 ].length;
 
+  // Pen: congelado; solo descuenta el retraso y al agotarse pasa a 'exit'.
+  if ( g.mode === 'pen' ) {
+    if ( g.releaseDelay > 0 ) g.releaseDelay--;
+    if ( g.releaseDelay <= 0 ) g.mode = 'exit';
+    return;
+  }
+
+  // Exit: avanzar celda a celda hacia el waypoint actual (la puerta, tile 3,
+  // ya es transitable para fantasmas). Al consumirlos todos pasa a 'normal'.
+  if ( g.mode === 'exit' ) {
+    if ( aligned( g.x ) && aligned( g.y ) ) {
+      g.x = Math.round( g.x );
+      g.y = Math.round( g.y );
+
+      const target = g.waypoints[ 0 ];
+      if ( g.x === target.x && g.y === target.y ) {
+        g.waypoints.shift();
+        if ( g.waypoints.length === 0 ) {
+          g.mode = 'normal';
+          // Elegir direccion de IA ya; el opuesto de 'up' evita volver
+          // a entrar por la puerta.
+          decideGhost( game, g );
+          return;
+        }
+      }
+      const next = g.waypoints[ 0 ];
+      g.dir = g.x === next.x
+        ? ( next.y < g.y ? 'up' : 'down' )
+        : ( next.x < g.x ? 'left' : 'right' );
+    }
+    const d = DIRS[ g.dir ];
+    g.x += d.x * g.speed;
+    g.y += d.y * g.speed;
+    return;
+  }
+
+  // Normal: IA greedy.
   if ( aligned( g.x ) && aligned( g.y ) ) {
     g.x = Math.round( g.x );
     g.y = Math.round( g.y );
